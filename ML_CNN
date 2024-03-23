@@ -1,0 +1,144 @@
+# Импортируем модуль операционной системы
+import os
+
+# Устанавливаем переменные окружения для конфигурации TensorFlow
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # Отключаем оптимизации oneDNN
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Уменьшаем количество логов
+
+# Импортируем остальные библиотеки
+import matplotlib.pyplot as plt
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import datasets, layers, models
+from tensorflow.keras.models import Model
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.layers import Input
+from tensorflow.keras.utils import plot_model
+
+# Загрузка и нормализация данных CIFAR-10
+(train_images, train_labels), (test_images, test_labels) = datasets.cifar10.load_data()
+train_images, test_images = train_images / 255.0, test_images / 255.0
+
+# Определение классов для CIFAR-10
+class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+
+# Отрисовка первых 25 изображений из обучающего набора данных с названиями классов в качестве меток
+plt.figure(figsize=(10, 10))  # Создание фигуры для отрисовки
+for i in range(25):  # Цикл для отрисовки 25 изображений
+    plt.subplot(5, 5, i + 1)  # Создание подграфика для каждого изображения
+    plt.xticks([])  # Удаление меток на оси X
+    plt.yticks([])  # Удаление меток на оси Y
+    plt.grid(False)  # Отключение сетки
+    plt.imshow(train_images[i], cmap=plt.cm.binary)  # Отображение i-го изображения
+    plt.xlabel(class_names[train_labels[i][0]])  # Подпись с названием класса
+plt.show()  # Показать фигуру с изображениями
+
+# Функция для случайного отражения изображений
+def random_flip(image, label):
+    image = tf.image.random_flip_left_right(image)
+    return image, label
+
+# Создание датасетов для обучения и тестирования
+train_dataset = tf.data.Dataset.from_tensor_slices((train_images, train_labels))
+test_dataset = tf.data.Dataset.from_tensor_slices((test_images, test_labels))
+
+# Применение аугментации и батчинга
+train_dataset = train_dataset.map(random_flip).batch(32).prefetch(tf.data.AUTOTUNE)
+test_dataset = test_dataset.batch(32).prefetch(tf.data.AUTOTUNE)
+
+# Путь к модели
+model_path = 'Model_CNN.keras' # Укажите путь к вашей модели
+
+# Загрузка или создание модели
+if os.path.exists(model_path):
+    model = load_model(model_path)
+    print("Модель загружена.")
+else:
+    model = models.Sequential([
+        Input(shape=(32, 32, 3)),  # Указываем форму входных данных для модели
+        layers.Conv2D(32, (3, 3), activation='relu', padding='same'), # Первый сверточный слой с сохранением размерности
+        layers.Conv2D(32, (3, 3), activation='relu', padding='same'),  # Второй сверточный слой
+        layers.MaxPooling2D((2, 2)),  # Слой пулинга для уменьшения размерности
+        layers.Dropout(0.2),  # Слой Dropout для предотвращения переобучения, отключает 20% нейронов
+
+        layers.Conv2D(64, (3, 3), activation='relu', padding='same'),  # Увеличиваем глубину и сохраняем размерность
+        layers.Conv2D(64, (3, 3), activation='relu', padding='same'),  # Еще один сверточный слой
+        layers.MaxPooling2D((2, 2)),  # Слой пулинга
+        layers.Dropout(0.3),  # Увеличиваем Dropout до 30% для следующих слоев
+
+        layers.Conv2D(128, (3, 3), activation='relu', padding='same'),  # Дальнейшее увеличение глубины
+        layers.Conv2D(128, (3, 3), activation='relu', padding='same'),  # Сверточный слой
+        layers.MaxPooling2D((2, 2)),  # Слой пулинга
+        layers.Dropout(0.4),  # Увеличение Dropout до 40%
+
+        layers.Flatten(),  # Выравниваем данные для полносвязного слоя
+        layers.Dense(128, activation='relu'),  # Полносвязный слой
+        layers.Dropout(0.5),  # Самый высокий уровень Dropout для предотвращения переобучения
+        layers.Dense(10, activation='softmax')  # Выходной слой с 10 классами
+    ])
+    print("Новая модель создана.")
+
+# Компиляция модели с адаптивной скоростью обучения
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)  # # Оптимизатор Adam с заданной скоростью обучения
+model.compile(optimizer=optimizer,
+              loss='sparse_categorical_crossentropy', # Функция потерь для классификации
+              metrics=['accuracy']) # Метрика оценки - точность
+
+# Параметры аугментации данных
+datagen = ImageDataGenerator(
+    rotation_range=15,  # Добавляем повороты на 15 градусов для имитации разных углов зрения
+    width_shift_range=0.1,  # Сдвигаем изображения по горизонтали на 10% их ширины
+    height_shift_range=0.1,  # Сдвигаем изображения по вертикали на 10% их высоты
+    shear_range=0.1,  # Применяем сдвиг для имитации изменения перспективы
+    zoom_range=0.2,  # Применяем случайное увеличение/уменьшение изображений
+    horizontal_flip=True,  # Добавляем отражение изображений по горизонтали
+    fill_mode='nearest'  # Заполняем новые пиксели, появляющиеся после трансформации ближайшими значениями
+)
+
+# Выводим сводку о модели
+model.summary()
+
+# Визуализация архитектуры модели
+plot_model(model, to_file='model_architecture.png', show_shapes=True, show_layer_names=True)
+
+# Использование Learning Rate Scheduler
+def lr_schedule(epoch):
+    # Функция для адаптивного изменения скорости обучения
+    lr = 0.001  # Начальная скорость обучения
+    if epoch > 10:
+        lr *= 0.5  # Уменьшаем скорость обучения вдвое после 10 эпох
+    elif epoch > 20:
+        lr *= 0.2  # Уменьшаем скорость обучения до 20% после 20 эпох
+    return lr
+
+# Создаем коллбек для динамического изменения скорости обучения
+lr_scheduler = tf.keras.callbacks.LearningRateScheduler(lr_schedule)
+
+# Создаем коллбек для ранней остановки обучения, если потери на валидационном наборе не улучшаются в течение 5 эпох
+early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
+
+# Обучение модели с аугментацией данных и коллбеками
+history = model.fit(
+    datagen.flow(train_images, train_labels, batch_size=64),
+    epochs=50,  # Устанавливаем общее число эпох
+    validation_data=(test_images, test_labels),  # Используем тестовый набор как валидационный
+    callbacks=[lr_scheduler, early_stopping],  # Добавляем созданные коллбеки
+    verbose=1  # Режим вывода: одна строка на эпоху
+)
+
+# Построение графиков точности на обучающем и валидационном наборах данных
+plt.plot(history.history['accuracy'], label='Точность на обучающем наборе')
+plt.plot(history.history['val_accuracy'], label='Точность на валидационном наборе')
+plt.xlabel('Эпоха')
+plt.ylabel('Точность')
+plt.legend(loc='lower right')
+plt.show()
+
+# Оценка модели
+test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=2)
+print(f"Точность на тестовом наборе: {test_acc}")
+
+# Сохранение модели после обучения
+model.save(model_path)
+print("Модель сохранена.")
