@@ -5,9 +5,9 @@
 ![Статистика модели CNN](https://github.com/NightInsight/MachineLearning_CNN_CV/assets/113856600/3d8f5e5e-ae55-4793-89cb-6ad72f536ed2)
 
  Для работы скрипта надо устанвоить следующие библиотеки:
- pip install tensorflow
- pip install numpy
- pip install matplotlib
+  pip install tensorflow
+  pip install numpy
+  pip install matplotlib
  
  Пошаговый порядок работы ML_CNN:
   1) Импорт библиотек и настройка TensorFlow:
