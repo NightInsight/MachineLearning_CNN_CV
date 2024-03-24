@@ -56,17 +56,23 @@ else:
     model = models.Sequential([
         Input(shape=(32, 32, 3)),  # Указываем форму входных данных для модели
         layers.Conv2D(32, (3, 3), activation='relu', padding='same'), # Первый сверточный слой с сохранением размерности
+        layers.BatchNormalization(), # Слой пакетной нормализации
         layers.Conv2D(32, (3, 3), activation='relu', padding='same'),  # Второй сверточный слой
+        layers.BatchNormalization(), # Слой пакетной нормализации
         layers.MaxPooling2D((2, 2)),  # Слой пулинга для уменьшения размерности
         layers.Dropout(0.2),  # Слой Dropout для предотвращения переобучения, отключает 20% нейронов
 
         layers.Conv2D(64, (3, 3), activation='relu', padding='same'),  # Третьий сверточный слой с большей глубиной
+        layers.BatchNormalization(), # Слой пакетной нормализации
         layers.Conv2D(64, (3, 3), activation='relu', padding='same'),  # Четвертый сверточный слой
+        layers.BatchNormalization(), # Слой пакетной нормализации
         layers.MaxPooling2D((2, 2)),  # Слой пулинга для уменьшения размерности
         layers.Dropout(0.3),  # Увеличиваем Dropout до 30% для дополнительной борьбы с переобучением
 
         layers.Conv2D(128, (3, 3), activation='relu', padding='same'),  # Пятый сверточный слой с большей глубиной
+        layers.BatchNormalization(), # Слой пакетной нормализации
         layers.Conv2D(128, (3, 3), activation='relu', padding='same'),  # Шестой сверточный слой с большей глубиной
+        layers.BatchNormalization(), # Слой пакетной нормализации
         layers.MaxPooling2D((2, 2)),  # Слой пулинга для уменьшения размерности
         layers.Dropout(0.4),  # Увеличение Dropout до 40% для дополнительной борьбы с переобучением
 
@@ -93,6 +99,11 @@ datagen = ImageDataGenerator(
     horizontal_flip=True,  # Добавляет отражение изображений по горизонтали
     fill_mode='nearest'  # Заполняет новые пиксели, появляющиеся после трансформации ближайшими значениями
 )
+
+# Добавление пакетной нормализации
+for i, layer in enumerate(model.layers):
+    if 'conv' in layer.name:
+        model.layers.insert(i+1, layers.BatchNormalization())
 
 # Выводит сводку о модели
 model.summary()
